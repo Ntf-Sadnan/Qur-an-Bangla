@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quran Verse Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Noto+Sans+Bengali:wght@100..900&family=Tiro+Bangla:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for modern look and fluid scroll */
+        body {
+            font-family: 'Hind Siliguri', sans-serif;
+            background-color: #000000;
+            /* Black background */
+            color: #ffffff;
+            /* White text */
+        }
+
+        /* Viewport for the scrolling verses */
+        .verse-viewport {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            max-width: 600px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        /* Common style for verse text containers */
+        .verse-text {
+            position: absolute;
+            width: 100%;
+            left: 0;
+            text-align: center;
+            padding: 1rem;
+            font-size: 1.5rem;
+            line-height: 1.8;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s ease-out;
+            will-change: transform, opacity;
+        }
+
+        /* Style for the currently visible verse */
+        #current-verse {
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 1;
+            z-index: 10;
+        }
+
+        /* Style for the upcoming (next) verse, positioned below */
+        #next-verse {
+            top: 100%;
+            transform: translateY(0%);
+            opacity: 0.6;
+            z-index: 5;
+        }
+
+        /* Minimalist Button */
+        #start-button {
+            background: none;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            /* Slightly stronger white border */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 999px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+        }
+
+        #start-button:hover {
+            background-color: rgba(255, 255, 255, 0.9);
+            color: black;
+        }
+
+        #start-button:active {
+            transform: scale(0.95);
+        }
+
+        #start-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: none;
+            color: rgba(255, 255, 255, 0.5);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Loading spinner */
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top: 4px solid #ffffff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Subtle reference text */
+        .verse-ref-display {
+            font-size: 0.875rem;
+            color: #cccccc;
+            /* Slightly lighter gray for reference */
+            margin-bottom: 0.5rem;
+            text-align: center;
+            height: 1.25rem;
+        }
+
+        /* Status message */
+        #status-message {
+            color: #f87171;
+            /* red-400 - Keep error message color */
+            min-height: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Surah List Styles */
+        #surah-selection-container {
+            margin-bottom: 2rem;
+            width: 100%;
+            max-width: 600px;
+
+        }
+
+        #surah-search-input {
+            margin-left: auto;
+            margin-right: auto;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            width: 40%;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background-color: #000000;
+            /* Black background for search input */
+            color: #ffffff;
+            /* White text in search input */
+            border: 1px solid #ffffff;
+            /* White border for search input */
+            border-radius: 999px;
+            /* Rounded border for search input */
+        }
+
+        #surah-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ffffff;
+            /* White border for surah list */
+            border-radius: 1rem;
+            /* Rounded border for surah list */
+            padding: 0.5rem;
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* IE and Edge */
+            min-height: 100px; /* Added min-height to prevent collapse */
+            display: flex; /* Enable flexbox for centering no results content */
+            flex-direction: column; /* Stack items vertically */
+            justify-content: flex-start; /* Align items to the start initially, will be centered if no results */
+            align-items: stretch; /* Stretch items to fill width */
+        }
+
+        #surah-list::-webkit-scrollbar {
+            display: none;
+            /* Chrome, Safari and Opera */
+        }
+
+
+        .surah-item {
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            border-radius: 1rem;
+            color: #ffffff;
+            /* White text for surah items */
+            text-align: left; /* Align surah text to the left */
+        }
+
+        .surah-item:hover {
+            background-color: #1a1a1a;
+            /* Slightly lighter black on hover */
+        }
+
+        .surah-item:nth-child(even) {
+            background-color: #000000;
+            /* Black background for even items */
+        }
+
+        .surah-item:nth-child(even):hover {
+            background-color: #1a1a1a;
+            /* Slightly lighter black on hover for even items */
+        }
+
+        /* No results style */
+        .no-results-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .no-results-icon {
+            width: 80px;
+            height: auto;
+            margin-bottom: 1rem;
+            opacity: 0.7; /* Reduced opacity for a subtle look */
+        }
+
+        .no-results-text {
+            color: #cccccc; /* Lighter text color for "No results" */
+            font-size: 1rem;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="status-message" class="text-center text-sm"></div>
+    <div id="loading-indicator" class="loader hidden"></div>
+
+    <!-- Surah Selection Container -->
+    <div id="surah-selection-container">
+        <input type="text" id="surah-search-input" placeholder="Search Surah Name">
+        <div id="surah-list">
+            <!-- Surah list will be populated here -->
+        </div>
+    </div>
+
+    <!-- Verse Reference Display Area - Hidden initially -->
+    <div id="current-verse-ref-display" class="verse-ref-display hidden"></div>
+
+    <!-- Viewport for Scrolling Verses - Hidden initially -->
+    <div class="verse-viewport hidden">
+        <div id="current-verse" class="verse-text">
+            <!-- Verse text will be loaded here -->
+        </div>
+        <div id="next-verse" class="verse-text">
+            <!-- Next verse will load here -->
+        </div>
+    </div>
+
+    <!-- Hidden Audio Player -->
+    <audio id="audio-player" class="hidden"></audio>
+
+    <!-- Control Button - Hidden initially -->
+    <div class="text-center hidden">
+        <button id="start-button">
+            Play
+        </button>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const currentVerseRefDisplay = document.getElementById('current-verse-ref-display');
+        const currentVerseTextEl = document.getElementById('current-verse');
+        const nextVerseTextEl = document.getElementById('next-verse');
+        const audioPlayer = document.getElementById('audio-player');
+        const startButton = document.getElementById('start-button');
+        const statusMessageEl = document.getElementById('status-message');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const verseViewport = document.querySelector('.verse-viewport');
+        const surahSelectionContainer = document.getElementById('surah-selection-container');
+        const surahSearchInput = document.getElementById('surah-search-input');
+        const surahListContainer = document.getElementById('surah-list');
+
+        // --- State Variables ---
+        let currentVerseRef = null;
+        let nextVerseRef = null;
+        let currentData = null;
+        let nextData = null;
+        let surahMeta = null;
+        let isPlaying = false;
+        let isLoading = false;
+        let isTransitioning = false;
+        let versesCache = {};
+        const CACHE_SIZE = 5;
+        let surahList = []; // Store surah list data
+        let filteredSurahList = []; // Store filtered surah list
+
+
+        // --- API Base URL ---
+        const API_BASE_URL = 'https://api.alquran.cloud/v1';
+
+        // --- Helper Functions ---
+
+        function setLoading(loading) {
+            isLoading = loading;
+            if (loading) {
+                loadingIndicator.classList.remove('hidden');
+                statusMessageEl.textContent = '';
+                startButton.disabled = true;
+            } else {
+                loadingIndicator.classList.add('hidden');
+                if (!isTransitioning) {
+                    startButton.disabled = false;
+                }
+            }
+        }
+
+        function displayError(message) {
+            console.error("Error:", message);
+            statusMessageEl.textContent = `Error: ${message}`;
+            setLoading(false);
+            startButton.disabled = false;
+            isTransitioning = false;
+            if (isPlaying) {
+                isPlaying = false;
+                startButton.textContent = "Play";
+            }
+        }
+
+        async function fetchMetadata() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/meta`);
+                if (!response.ok) {
+                    throw new Error(`API request failed with status ${response.status}`);
+                }
+                const data = await response.json();
+                if (data.code === 200 && data.data && data.data.surahs && data.data.surahs.references) {
+                    surahMeta = data.data.surahs;
+                    surahList = data.data.surahs.references; // Store surah list data
+                    filteredSurahList = [...surahList]; // Initially, filtered list is same as full list
+                    console.log("Metadata loaded:", surahMeta);
+                    populateSurahList(filteredSurahList); // Populate the surah list on UI
+                } else {
+                    throw new Error("Invalid metadata format received from API.");
+                }
+            } catch (error) {
+                displayError(`Failed to load Quran metadata. ${error.message}`);
+                surahMeta = null;
+            }
+        }
+
+
+        async function fetchVerseData(verseRef) {
+            if (!verseRef) return null;
+            if (versesCache[verseRef]) {
+                console.log(`Returning verse from cache: ${verseRef}`);
+                return versesCache[verseRef];
+            }
+
+            console.log(`Fetching data for ${verseRef}...`);
+            try {
+                const [textResponse, audioResponse] = await Promise.all([
+                    fetch(`${API_BASE_URL}/ayah/${verseRef}/bn.bengali`),
+                    fetch(`${API_BASE_URL}/ayah/${verseRef}/ar.alafasy`)
+                ]);
+
+                if (!textResponse.ok) throw new Error(`Text fetch failed (${textResponse.status})`);
+                if (!audioResponse.ok) throw new Error(`Audio fetch failed (${audioResponse.status})`);
+
+
+                const [textData, audioData] = await Promise.all([
+                    textResponse.json(),
+                    audioResponse.json()
+                ]);
+
+                if (textData.code !== 200 || !textData.data) throw new Error('Invalid text data received.');
+                if (audioData.code !== 200 || !audioData.data || !audioData.data.audio) throw new Error('Invalid audio data received.');
+
+                const verseData = {
+                    text: textData.data.text,
+                    audio: audioData.data.audio,
+                    ref: verseRef
+                };
+
+                versesCache[verseRef] = verseData;
+                return verseData;
+            } catch (error) {
+                displayError(`Failed to fetch data for verse ${verseRef}. ${error.message}`);
+                return null;
+            }
+        }
+
+
+        function getNextVerseRef(currentRef) {
+            if (!currentRef || !surahMeta) return null;
+            const [surahStr, ayahStr] = currentRef.split(':');
+            let surah = parseInt(surahStr, 10);
+            let ayah = parseInt(ayahStr, 10);
+            if (isNaN(surah) || isNaN(ayah)) return null;
+            const currentSurahInfo = surahMeta.references.find(s => s.number === surah);
+            if (!currentSurahInfo) return null;
+            if (ayah < currentSurahInfo.numberOfAyahs) {
+                return `${surah}:${ayah + 1}`;
+            } else {
+                const nextSurah = surah + 1;
+                if (nextSurah > 114) {
+                    return null;
+                }
+                return `${nextSurah}:1`;
+            }
+        }
+
+        async function prefetchVerses(startRef, count = CACHE_SIZE) {
+            if (!surahMeta || !startRef) return;
+
+            let ref = startRef;
+            for (let i = 0; i < count; i++) {
+                const verseData = await fetchVerseData(ref);
+                if (!verseData) {
+                    console.warn(`Prefetch stopped at ${ref} due to an error or end of surah.`);
+                    break;
+                }
+                ref = getNextVerseRef(ref);
+                if (!ref) break;
+            }
+        }
+
+
+        function updateUIDisplay() {
+            if (currentData) {
+                currentVerseRefDisplay.textContent = `Surah ${currentData.ref.replace(':', ', Ayah ')}`;
+                currentVerseTextEl.textContent = currentData.text;
+                audioPlayer.src = currentData.audio;
+
+                currentVerseTextEl.style.transition = 'none';
+                currentVerseTextEl.style.opacity = '1';
+                currentVerseTextEl.style.transform = 'translateY(-50%)';
+                currentVerseTextEl.style.top = '50%';
+                void currentVerseTextEl.offsetHeight;
+                currentVerseTextEl.style.transition = '';
+
+            } else {
+                currentVerseRefDisplay.textContent = '';
+                currentVerseTextEl.textContent = 'Load failed or end reached.';
+                currentVerseTextEl.style.transition = 'none';
+                currentVerseTextEl.style.opacity = '1';
+                currentVerseTextEl.style.transform = 'translateY(-50%)';
+                currentVerseTextEl.style.top = '50%';
+                void currentVerseTextEl.offsetHeight;
+                currentVerseTextEl.style.transition = '';
+                audioPlayer.src = '';
+            }
+
+            if (nextData) {
+                nextVerseTextEl.textContent = nextData.text;
+
+                nextVerseTextEl.style.transition = 'none';
+                nextVerseTextEl.style.opacity = '0.6';
+                nextVerseTextEl.style.transform = 'translateY(0%)';
+                nextVerseTextEl.style.top = '100%';
+                void nextVerseTextEl.offsetHeight;
+                nextVerseTextEl.style.transition = '';
+
+            } else {
+                nextVerseTextEl.textContent = 'End of Quran reached.';
+                nextVerseTextEl.style.transition = 'none';
+                nextVerseTextEl.style.opacity = '0.6';
+                nextVerseTextEl.style.transform = 'translateY(0%)';
+                nextVerseTextEl.style.top = '100%';
+                void nextVerseTextEl.offsetHeight;
+                nextVerseTextEl.style.transition = '';
+            }
+        }
+
+
+        async function playNextVerse() {
+            if (isLoading || isTransitioning || !nextData) {
+                if (!nextData && currentData) {
+                    console.log("End of Quran sequence.");
+                    isPlaying = false;
+                    startButton.textContent = "Play Again";
+                    currentVerseRef = null;
+                    currentData = null;
+                    updateUIDisplay();
+                }
+                return;
+            }
+
+            isTransitioning = true;
+            startButton.disabled = true;
+            console.log("Transitioning to:", nextData.ref);
+
+            currentVerseTextEl.style.transform = 'translateY(-150%)';
+            currentVerseTextEl.style.opacity = '0';
+            nextVerseTextEl.style.top = '50%';
+            nextVerseTextEl.style.transform = 'translateY(-50%)';
+            nextVerseTextEl.style.opacity = '1';
+
+            setTimeout(async () => {
+                currentData = nextData;
+                currentVerseRef = currentData.ref;
+
+                const newNextRef = getNextVerseRef(currentVerseRef);
+                nextVerseRef = newNextRef;
+                if (newNextRef) {
+                    nextData = await fetchVerseData(newNextRef);
+                    if (!nextData) {
+                        displayError(`Could not load next verse (${newNextRef}). Stopping.`);
+                        isPlaying = false;
+                        startButton.textContent = "Play Again";
+                        currentVerseRef = null;
+                        currentData = null;
+                        nextData = null;
+                    }
+                } else {
+                    nextData = null;
+                    console.log("End of Quran data reached.");
+                }
+
+                updateUIDisplay();
+
+                isTransitioning = false;
+                if (!isLoading) {
+                    startButton.disabled = false;
+                }
+
+                if (currentData && isPlaying) {
+                    try {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        await audioPlayer.play();
+                        console.log("Playing:", currentVerseRef);
+                    } catch (error) {
+                        console.error("Error playing audio:", error);
+                        displayError("Could not automatically play the next verse.");
+                        isPlaying = false;
+                        startButton.textContent = "Play";
+                        startButton.disabled = false;
+                    }
+                } else if (!currentData) {
+                    displayError("Playback stopped: No current verse data.");
+                    isPlaying = false;
+                    startButton.textContent = "Play Again";
+                    startButton.disabled = false;
+                }
+                if (currentVerseRef) {
+                    const nextChunkStart = getNextVerseRef(newNextRef || currentVerseRef);
+                    if (nextChunkStart) {
+                        prefetchVerses(nextChunkStart, CACHE_SIZE);
+                    }
+                }
+
+            }, 800);
+        }
+
+
+        async function initializePlayer(startSurahNumber) {
+            if (isLoading || isTransitioning) return;
+            setLoading(true);
+            statusMessageEl.textContent = '';
+
+            if (!surahMeta) {
+                await fetchMetadata();
+                if (!surahMeta) {
+                    displayError("Cannot start player without Surah metadata.");
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            let startVerseRef;
+            if (startSurahNumber) {
+                startVerseRef = `${startSurahNumber}:1`;
+            } else {
+                startVerseRef = "1:1"; // Default to Al-Fatiha
+            }
+
+
+            currentVerseRef = startVerseRef;
+            nextVerseRef = getNextVerseRef(currentVerseRef);
+
+            try {
+                const [initialCurrentData, initialNextData] = await Promise.all([
+                    fetchVerseData(currentVerseRef),
+                    fetchVerseData(nextVerseRef)
+                ]);
+
+                if (!initialCurrentData) {
+                    setLoading(false);
+                    return;
+                }
+
+                currentData = initialCurrentData;
+                nextData = initialNextData;
+
+                updateUIDisplay();
+
+                isPlaying = true;
+                startButton.textContent = "Pause";
+                setLoading(false);
+
+                try {
+                    await audioPlayer.play();
+                    console.log("Playing initial verse:", currentVerseRef);
+                } catch (error) {
+                    console.error("Error playing initial audio:", error);
+                    displayError("Could not play the first verse automatically.");
+                    isPlaying = false;
+                    startButton.textContent = "Play";
+                    startButton.disabled = false;
+                }
+
+                if (nextVerseRef) {
+                    prefetchVerses(getNextVerseRef(nextVerseRef), CACHE_SIZE);
+                }
+
+
+            } catch (error) {
+                displayError(`Initialization failed. ${error.message}`);
+                isPlaying = false;
+                startButton.textContent = "Play";
+                currentData = null;
+                nextData = null;
+                currentVerseRef = null;
+                updateUIDisplay();
+                setLoading(false);
+            }
+        }
+
+        // --- UI Population Functions ---
+        function populateSurahList(surahs) {
+            surahListContainer.innerHTML = ''; // Clear existing list
+            if (surahs.length === 0) {
+                // Display "No results" icon and message
+                surahListContainer.style.justifyContent = 'center'; // Center content when no results
+                const noResultsContainer = document.createElement('div');
+                noResultsContainer.classList.add('no-results-container');
+
+                const icon = document.createElement('img');
+                icon.src = 'https://cdni.iconscout.com/illustration/premium/thumb/nothing-here-yet-illustration-download-in-svg-png-gif-file-formats--404-page-not-found-planet-empty-state-space-pack-science-technology-illustrations-6763428.png';
+                icon.alt = 'No results found';
+                icon.classList.add('no-results-icon');
+
+                const text = document.createElement('p');
+                text.textContent = 'No Surahs found matching your search.';
+                text.classList.add('no-results-text');
+
+                noResultsContainer.appendChild(icon);
+                noResultsContainer.appendChild(text);
+                surahListContainer.appendChild(noResultsContainer);
+
+
+            } else {
+                surahListContainer.style.justifyContent = 'flex-start'; // Reset to default alignment when results are present
+                surahs.forEach(surah => {
+                    const surahItem = document.createElement('div');
+                    surahItem.classList.add('surah-item');
+                    surahItem.textContent = `${surah.number}. ${surah.englishName} (${surah.englishNameTranslation})`;
+                    surahItem.addEventListener('click', () => selectSurah(surah.number));
+                    surahListContainer.appendChild(surahItem);
+                });
+            }
+        }
+
+
+        function filterSurahList(searchTerm) {
+            const lowerSearchTerm = searchTerm.toLowerCase();
+            filteredSurahList = surahList.filter(surah => {
+                return surah.englishName.toLowerCase().includes(lowerSearchTerm) ||
+                    surah.englishNameTranslation.toLowerCase().includes(lowerSearchTerm);
+            });
+            populateSurahList(filteredSurahList);
+        }
+
+        function selectSurah(surahNumber) {
+            surahSelectionContainer.classList.add('hidden'); // Hide surah selection
+            currentVerseRefDisplay.classList.remove('hidden'); // Show verse display
+            verseViewport.classList.remove('hidden');
+            startButton.parentElement.classList.remove('hidden'); // Show button container
+            startButton.textContent = `Play (${surahNumber}:1)`; // Update button text
+
+            initializePlayer(surahNumber);
+        }
+
+
+        // --- Event Listeners ---
+
+        startButton.addEventListener('click', () => {
+            if (isTransitioning) return;
+
+            if (!isPlaying) {
+                if (!currentData) {
+                    initializePlayer(); // If no surah selected yet, it will start from 1:1 now as default is handled in initializePlayer
+                } else if (audioPlayer.src && !audioPlayer.ended) {
+                    audioPlayer.play().then(() => {
+                        isPlaying = true;
+                        startButton.textContent = "Pause";
+                        statusMessageEl.textContent = '';
+                        console.log("Resumed playback");
+                    }).catch(error => {
+                        console.error("Error resuming playback:", error);
+                        displayError("Could not resume playback.");
+                    });
+                } else {
+                    initializePlayer(); // Re-initialize if ended or no src
+                }
+            } else {
+                audioPlayer.pause();
+                isPlaying = false;
+                startButton.textContent = "Play";
+                console.log("Playback paused");
+            }
+        });
+
+        audioPlayer.addEventListener('ended', playNextVerse);
+
+        audioPlayer.addEventListener('error', (e) => {
+            console.error('Audio Player Error:', e);
+            displayError('An error occurred with the audio player.');
+            isPlaying = false;
+            startButton.textContent = "Play";
+            startButton.disabled = false;
+        });
+
+        surahSearchInput.addEventListener('input', (e) => {
+            filterSurahList(e.target.value);
+        });
+
+
+        // --- Initial Setup ---
+        fetchMetadata(); // Fetch metadata and populate surah list on load
+        currentVerseRefDisplay.textContent = '';
+
+
+    </script>
+
+</body>
+
+</html>
